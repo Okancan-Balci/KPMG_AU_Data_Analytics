@@ -1,0 +1,249 @@
+---
+output:
+  html_document:
+    theme: flatly
+    highlight: pygments
+    toc: true
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
+    toc_depth: 4
+    df_print: paged
+    code_folding: show
+---
+
+```{r, include=FALSE}
+library(tidyverse)
+library(readxl)
+library(GGally)
+library(broom)
+library(ggfortify)
+library(skimr)
+library(lubridate)
+
+
+options(scipen = 20)
+
+knitr::opts_chunk$set(warning = FALSE,
+                      message = FALSE,
+                      fig.align = "center",
+                      fig.width = 8)
+
+```
+
+
+
+```{r}
+sheets <- readxl::excel_sheets("KPMG_VI_New_raw_data_update_final.xlsx")[-1]
+
+
+for (sheet in sheets) {
+    assign(as.character(sheet),
+           read_xlsx("KPMG_VI_New_raw_data_update_final.xlsx", sheet = sheet, skip = 1))
+}
+
+sheets
+```
+
+## Transactions
+
+```{r}
+head(Transactions, 10)
+skim(Transactions)
+```
+
+
+There are some entries which miss the identification of online_order status. This should be addressed in the data collection process.
+
+```{r}
+Transactions %>% 
+  count(online_order, sort = T)
+
+
+Transactions %>% 
+  filter(is.na(online_order))
+```
+
+There are some entries in data table which have no product information. The missing columns are `brand, product_line, product_class, product_size, standard_cost, product_first_sold_date`. This problem might have arisen from a system bug. Additionally, all the missing products have the id of "0".
+
+```{r}
+Transactions %>% 
+  filter(is.na(brand))
+
+Transactions %>% 
+  filter(is.na(brand)) %>% 
+  count(product_id)
+```
+
+Also this table needs a consistent time formatting. Variables `transaction_date` and `product_first_sold_date` are both dates but their inconsistent formatting make it harder to read and parse the data.
+
+
+## New Customer List
+
+This table has some "hidden" columns! If you use Excel you might miss them but R never misses! Additionally the `Rank` and one of the hidden columns `...21` are duplicated.
+
+There is no customer_id column in this table and this might cause problems.
+
+```{r}
+skim(NewCustomerList)
+head(NewCustomerList, 10)
+```
+
+
+`job_industry_category` has missing values but the representation of the missing values should not be a text placeholder such as `n/a`.
+
+```{r}
+NewCustomerList %>% 
+  count(job_industry_category, sort = T)
+```
+
+There are many inconsistencies about job titles. There are Latin numbers with job titles and meaning of them are vague. There are also missing values.
+
+```{r}
+NewCustomerList %>% 
+  count(job_title, sort = T) %>% 
+  slice(80:90)
+```
+
+There is a gender called "U". Is this a bug or some placeholder for non-binary persons?
+
+
+```{r}
+NewCustomerList %>% 
+  count(gender)
+```
+The Date of Birth variable has inconsistent and non-accurate values. Time formatting should be consistent.
+
+## Customer Demographic
+
+```{r}
+skim(CustomerDemographic)
+head(CustomerDemographic) 
+```
+
+Time formatting is inconsistent in this table too.
+
+```{r}
+CustomerDemographic %>% 
+  select(DOB) %>% 
+  slice(30:40)
+```
+
+Gender Values are inconsistent.
+
+```{r}
+CustomerDemographic %>% 
+  count(gender, sort = T)
+```
+
+Job Titles are ver inconsistent. They should be all lower case. There are also values with Latin numbers such as `Health Coach I` and `Health Coach III`.
+
+```{r}
+CustomerDemographic %>% 
+  count(job_title, sort = T)
+```
+
+Customer Demographic table requires a proper Missing Value place holder. In `job_industry_category` there are string "n/a" values.
+
+```{r}
+CustomerDemographic %>% 
+  count(job_industry_category, sort = T)
+```
+
+
+Some customers have missing last names. 
+
+There is a "default" column with many random values. Probably because of some bug in the data acquisition process.
+
+```{r}
+CustomerDemographic %>% 
+  select(default) %>% 
+  slice_head(n = 10)
+```
+
+
+
+## Customer Address
+
+```{r}
+head(CustomerAddress)
+skim(CustomerAddress)
+```
+
+
+
+
+
+New South Vales and NSW are probably the same state. The similar situation goes for VIC and Victoria.
+
+```{r}
+CustomerAddress %>% 
+  count(state)
+```
+
+
+## Joins
+
+These customers don't have their address information.
+
+```{r}
+CustomerDemographic %>% 
+  anti_join(CustomerAddress, by = "customer_id") 
+```
+
+There are also customers who have their address information but they don't exist in customer data.
+
+```{r}
+CustomerAddress %>% 
+  anti_join(CustomerDemographic, by = "customer_id") 
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

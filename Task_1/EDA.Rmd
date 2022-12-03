@@ -1,15 +1,16 @@
 ---
+title: "Data Quality Report"
 output:
   html_document:
-    theme: flatly
+    theme: simplex
     highlight: pygments
     toc: true
     toc_float:
-      collapsed: true
+      collapsed: false
       smooth_scroll: true
     toc_depth: 4
     df_print: paged
-    code_folding: show
+    code_folding: hide
 ---
 
 ```{r, include=FALSE}
@@ -20,6 +21,8 @@ library(broom)
 library(ggfortify)
 library(skimr)
 library(lubridate)
+library(janitor) ## excel_numeric_to_date()
+
 
 
 options(scipen = 20)
@@ -33,7 +36,7 @@ knitr::opts_chunk$set(warning = FALSE,
 
 
 
-```{r}
+```{r, include=FALSE}
 sheets <- readxl::excel_sheets("KPMG_VI_New_raw_data_update_final.xlsx")[-1]
 
 
@@ -45,9 +48,58 @@ for (sheet in sheets) {
 sheets
 ```
 
-## Transactions
 
-```{r}
+
+Hello
+
+This e-mail was sent to you in order to address some issues we have been having in terms of data quality. I will be starting with outlining the issues we have been encountered and then more detailed analysis will be laid out to exemplify the quality issues with the data.
+
+## Data Quality Outline
+
+Before starting out with problems of the data tables that we were presented. I have to point out the importance of the meta data. To produce a sound analysis getting the context of the data is very important. This context is almost always supplied by the meta data. Within meta data columns that a data table contains are explained so there is no questions about the data itself. Thus, we need you to provide meta data as well.
+
+#### Transactions 
+
+1. `online_order` status is missing for some observations.
+2. Some entries miss product information. Affected columns are `brand, product_line, product_class, product_size, standard_cost, product_first_sold_date`.
+3. Columns `transaction_date` and `product_first_sold_date` are both dates but they have inconsistent formats.
+
+#### New Customer List
+
+1. Encountered some hidden columns while reading the data. Please make sure that you expand all the columns and name them correctly.
+2. Also one of the hidden columns is a duplicate of `Rank` column.
+3. `job_industry_category` has missing values but the representation of the missing values should not be a text placeholder such as `n/a`.
+4. There are many inconsistencies about job titles. There are Latin numbers with job titles and meaning of them are vague. There are also missing values.
+5. There is a gender called "U".
+6. The Date of Birth variable has inconsistent, non-accurate values and missing. Time formatting should be consistent.
+
+#### Customer Demographic
+
+1. Time formatting is inconsistent. There is one customer who was born in 1843. The same customer also has a gender of "U"
+2. Gender Values are inconsistent.
+3. Job Titles are ver inconsistent. They should be all lower case. There are also values with Latin numbers such as `Health Coach I` and `Health Coach III`.
+4. Customer Demographic table requires a proper Missing Value place holder. In `job_industry_category` there are string "n/a" values.
+5. Some customers have missing last names. 
+6. There is a "default" column with many random values.
+
+#### Customer Address
+
+1. There are abbreviations for state names along with long state names such as New South Vales and NSW.
+
+#### Problems which are related to more than one table
+
+1. Some customers in `CustomerDemographic` don't have their correspondents in `CustomerAddress`.
+2. Also there are some customers only with addresses in `CustomerAddress`.
+
+
+## In Depth Analysis
+
+### Transactions
+
+```{r,include=FALSE}
+Transactions <- Transactions %>% 
+  mutate(product_first_sold_date = excel_numeric_to_date(product_first_sold_date))
+
 head(Transactions, 10)
 skim(Transactions)
 ```
@@ -78,17 +130,20 @@ Transactions %>%
 Also this table needs a consistent time formatting. Variables `transaction_date` and `product_first_sold_date` are both dates but their inconsistent formatting make it harder to read and parse the data.
 
 
-## New Customer List
+
+### New Customer List
 
 This table has some "hidden" columns! If you use Excel you might miss them but R never misses! Additionally the `Rank` and one of the hidden columns `...21` are duplicated.
 
 There is no customer_id column in this table and this might cause problems.
 
-```{r}
+```{r,include=FALSE}
+NewCustomerList <- NewCustomerList %>% 
+  mutate(DOB = convert_to_date(DOB))
+
 skim(NewCustomerList)
 head(NewCustomerList, 10)
 ```
-
 
 `job_industry_category` has missing values but the representation of the missing values should not be a text placeholder such as `n/a`.
 
@@ -114,9 +169,12 @@ NewCustomerList %>%
 ```
 The Date of Birth variable has inconsistent and non-accurate values. Time formatting should be consistent.
 
-## Customer Demographic
+### Customer Demographic
 
-```{r}
+```{r,include=FALSE}
+CustomerDemographic <- CustomerDemographic %>% 
+  mutate(DOB = convert_to_date(DOB))
+
 skim(CustomerDemographic)
 head(CustomerDemographic) 
 ```
@@ -163,9 +221,9 @@ CustomerDemographic %>%
 
 
 
-## Customer Address
+### Customer Address
 
-```{r}
+```{r,include=FALSE}
 head(CustomerAddress)
 skim(CustomerAddress)
 ```
@@ -182,7 +240,7 @@ CustomerAddress %>%
 ```
 
 
-## Joins
+### Joins
 
 These customers don't have their address information.
 
@@ -197,6 +255,11 @@ There are also customers who have their address information but they don't exist
 CustomerAddress %>% 
   anti_join(CustomerDemographic, by = "customer_id") 
 ```
+
+
+
+
+
 
 
 

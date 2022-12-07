@@ -1,0 +1,200 @@
+---
+output:
+  html_document:
+    keep_md: true
+    theme: simplex
+    highlight: pygments
+    toc: true
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
+    toc_depth: 4
+    df_print: paged
+    code_folding: hide
+fontsize: 12pt
+---
+
+```{r, include=FALSE}
+library(tidyverse)
+library(readxl)
+library(GGally)
+library(broom)
+library(ggfortify)
+library(skimr)
+library(lubridate)
+library(janitor) ## excel_numeric_to_date()
+
+
+
+options(scipen = 20)
+
+knitr::opts_chunk$set(warning = FALSE,
+                      message = FALSE,
+                      fig.align = "center",
+                      fig.width = 8)
+
+```
+
+
+
+```{r, include=FALSE}
+sheets <- readxl::excel_sheets("KPMG_VI_New_raw_data_update_final.xlsx")[-1]
+
+
+for (sheet in sheets) {
+    assign(as.character(sheet),
+           read_xlsx("KPMG_VI_New_raw_data_update_final.xlsx", sheet = sheet, skip = 1))
+}
+
+```
+
+
+# Data Cleaning
+
+## Transactions
+
+I don' think keeping cancelled orders is going to help us find lucrative customers. 
+
+```{r}
+Transactions <- Transactions %>% 
+  filter(order_status != "Cancelled")
+```
+
+I am going to use `list_price` - `standard_cost` = `profit` as a candidate response variable. Also I want to try `profit_per_interaction` variable as a response as well. So I am removing the observations which miss `standard_cost`.
+
+```{r}
+Transactions <- Transactions %>% 
+  filter(!is.na(standard_cost))
+```
+
+I am not going to remove observations with missing `online_order`values because their `list_price` and `standard_cost` values are intact.
+
+This is the table that holds potential response variables. 
+
+```{r}
+response_table <- Transactions %>% 
+  mutate(profit = list_price - standard_cost) %>% 
+  group_by(customer_id) %>% 
+  summarise(
+    total_profit = sum(profit),
+    n_transaction = n()
+  ) %>% 
+  mutate(profit_per_transaction = total_profit / n_transaction)
+```
+
+The number of transactions seems like a nice candidate for Poisson Regression but Profits per Transaction has nice distribution except for very high values.
+
+```{r}
+response_table %>% 
+  ggplot(aes(n_transaction))+
+  geom_bar()
+
+response_table %>% 
+  ggplot(aes(total_profit))+
+  geom_histogram(color = "white")
+
+response_table %>% 
+  ggplot(aes(profit_per_transaction))+
+  geom_histogram(color = "white")
+```
+
+## Customer Demographic and Address
+
+These tables hold our predictors.
+
+There were some inconsistencies with the gender variable. For now I am only adjusting typos and "F", "M" type of errors. I am keeping gender "U" because it might have some systematic information. Though the amount of observations are very low.
+
+```{r}
+CustomerDemographic <- CustomerDemographic %>% 
+  mutate(gender = ifelse(gender %in% c("F", "Femal"), "Female", gender)) %>%
+  mutate(gender = ifelse(gender == "M", "Male", gender))
+```
+
+I am dropping some useless columns for modeling process. 
+
+```{r}
+CustomerDemographic <- CustomerDemographic %>% 
+  select(-default, -first_name, -last_name, -deceased_indicator,)
+```
+
+Adjusting job titles.
+
+```{r}
+CustomerDemographic %>% skim()
+  filter(is.na(job_title)) %>% 
+  select(job_title, job_industry_category)
+```
+
+
+```{r}
+CustomerDemographic %>% 
+  filter(job_industry_category == "n/a" & !is.na(job_title))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

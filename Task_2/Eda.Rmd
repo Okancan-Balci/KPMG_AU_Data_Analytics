@@ -98,11 +98,11 @@ response_table %>%
   geom_histogram(color = "white")
 ```
 
-## Customer Demographic and Address
+## Customer Demographic 
 
 These tables hold our predictors.
 
-There were some inconsistencies with the gender variable. For now I am only adjusting typos and "F", "M" type of errors. I am keeping gender "U" because it might have some systematic information. Though the amount of observations are very low.
+There were some inconsistencies with the gender variable. For now I am only adjusting typos and "F", "M" type of errors. I am keeping gender "U" because it might have some systematic information. Though the amount of observations are very low. (I realized later that all observations of gender "U" were gone after I cleaned some other values because some variables were missing. No need to worry about them for now.)
 
 ```{r}
 CustomerDemographic <- CustomerDemographic %>% 
@@ -117,44 +117,200 @@ CustomerDemographic <- CustomerDemographic %>%
   select(-default, -first_name, -last_name, -deceased_indicator,)
 ```
 
-Adjusting job titles.
+Adjusting job titles. `job_industry_category` has more missing values than `job_title`. I am thinking of stripping latin numbers from job titles and using it as a predictor.
 
 ```{r}
-CustomerDemographic %>% skim()
-  filter(is.na(job_title)) %>% 
-  select(job_title, job_industry_category)
+## Missing Values for variable job_title
+CustomerDemographic %>% 
+  pull(job_title) %>% is.na() %>% sum()
+## Missing Values for variable job_industry_category
+CustomerDemographic %>% 
+  filter(job_industry_category == "n/a") %>% nrow()
 ```
 
+```{r}
+CustomerDemographic <- CustomerDemographic %>% 
+  mutate(job_title = str_remove(job_title, regex(" [IV]+"))) 
+```
+
+I am also removing observations with missing job titles.
+
+```{r}
+CustomerDemographic <- CustomerDemographic %>% 
+  filter(!is.na(job_title))
+```
+
+Removing rest of the observations which have missing values for variables `DOB` and `tenure`. Luckily these observations are the same.
+
+```{r}
+CustomerDemographic <- CustomerDemographic %>% 
+  filter(!is.na(tenure)) 
+```
+
+Parsing the `DOB` (the day of birth) correctly.
+
+```{r}
+CustomerDemographic <- CustomerDemographic %>% 
+  mutate(DOB = convert_to_date(DOB))
+```
+
+There is one person who was born in 1843. I am removing that observation.
 
 ```{r}
 CustomerDemographic %>% 
-  filter(job_industry_category == "n/a" & !is.na(job_title))
+  slice_min(order_by = DOB, n = 5)
+```
+
+```{r}
+CustomerDemographic <- CustomerDemographic %>% 
+  filter(customer_id != 34)
+```
+
+I also want to engineer a customer age variable. Since all transactions were occurred in the year 2017, I will be calculating ages based on the middle of the 2017.
+
+```{r}
+CustomerDemographic <- CustomerDemographic %>% 
+  mutate(age = as.integer((ymd("2017-06-01") - DOB) / 365.25))
 ```
 
 
+```{r}
+(nrow(CustomerDemographic) - 4000) / 4000
+```
+
+We only lost about %15 of our observations for this table. Not great but not terrible.
+
+## Customer Address
+
+The same states had different names in the data set. I am fixing that.
+
+```{r}
+CustomerAddress %>% count(state)
+
+CustomerAddress <- CustomerAddress %>% 
+  mutate(state = ifelse(state == "New South Wales", "NSW", state),
+         state = ifelse(state == "Victoria", "VIC", state)) 
+```
+
+```{r}
+CustomerAddress %>% count(state)
+```
 
 
+## Joining Customer Demographic and Customer Address Tables
+
+I am joining these two tables to create a bigger predictor pool. Also removing the country column because every observation is from Australia.
+
+```{r}
+Customer_Joined <- CustomerDemographic %>% 
+  inner_join(CustomerAddress, by = "customer_id") %>% 
+  select(-country)
+```
+
+In the join process 2 observations were also lost. For now, this completes the data cleaning process for our training set.
+
+## Cleaning the new data New Customer List
+
+Filtering out irrelevant columns and creating a new data set.
+
+```{r}
+New_Costumers <- NewCustomerList %>% 
+  select(any_of(names(Customer_Joined)))
+```
+
+Since I am going to use `day_of_birth` and `job_title` as predictors I am dropping observations with missing values.
+
+```{r}
+New_Costumers <- New_Costumers %>%
+  drop_na()
+```
+
+Parsing `DOB` properly as a data variable.
+
+```{r}
+New_Costumers <- New_Costumers %>% 
+  mutate(DOB = convert_to_date(DOB))
+```
+
+Adjusting `job_titles` and stripping latin numerics.
+
+```{r}
+New_Costumers <- New_Costumers %>% 
+  mutate(job_title = str_remove(job_title, regex(" [IV]+"))) 
+```
+
+Creating an `age` variable for the new data set as well.
+
+```{r}
+New_Costumers <- New_Costumers %>% 
+  mutate(age = as.integer((ymd("2017-06-01") - DOB) / 365.25)) 
+```
+
+Since I am thinking about using `job_title` variable as a predictor and it is a categorical variable I have to make sure that both train and prediction sets have the same categories.
+
+```{r}
+all(unique(Customer_Joined$job_title) %in% unique(New_Costumers$job_title))
+```
+
+Let's compare summary statistics for both train and prediction sets for the last time.
+
+```{r}
+New_Costumers %>% 
+  skim()
+```
 
 
+```{r}
+Customer_Joined %>%
+  mutate(postcode = as.character(postcode)) %>% 
+  skim()
+```
+
+Everything looks fine here.
+
+## Merging Response variable and Predictor Variables into a single Table
+
+```{r}
+Customer_Joined %>% 
+  inner_join(response_table, by = "customer_id") 
+```
+
+Seems like some of the customers didn't buy anything in 2017. I think leaving them out would be wrong and we would lose a good chunk of our data. After I join these two tables I am also going to set profit values to zero for these consumers. This way Machine Learning algorithm can learn what kind of consumers don't make any transactions.
+
+```{r}
+Customer_Joined <- Customer_Joined %>% 
+  left_join(response_table, by = "customer_id") %>% 
+  replace_na(list(total_profit = 0,
+                  n_transaction = 0,
+                  profit_per_transaction = 0))
+```
+
+# Exploratory Data Analysis
+
+I made my best to clean the data now lets try to explore it.
+
+```{r}
+Customer_Joined %>% skim()
+```
+
+## Continious Variables
 
 
+```{r}
+Customer_Joined %>% 
+  ggplot(aes(total_profit))+
+  geom_histogram(color = "white")
+```
 
+```{r}
+Customer_Joined %>% 
+  ggplot(aes(profit_per_transaction, reorder(state, profit_per_transaction)))+
+  geom_boxplot()
+```
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+```{r}
+Transactions
+```
 
 
 

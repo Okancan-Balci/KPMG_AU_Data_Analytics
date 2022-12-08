@@ -285,6 +285,9 @@ Customer_Joined <- Customer_Joined %>%
                   profit_per_transaction = 0))
 ```
 
+
+
+
 # Exploratory Data Analysis
 
 I made my best to clean the data now lets try to explore it.
@@ -296,39 +299,125 @@ Customer_Joined %>% skim()
 ## Continious Variables
 
 
+## Categorical Variables
+
+
+```{r, fig.width=7, fig.height=8}
+Customer_Joined %>% 
+  mutate(post_code_cut = cut_width(postcode, 100, dig.lab = 5)) %>% 
+  ggplot(aes(profit_per_transaction, reorder(post_code_cut, profit_per_transaction, FUN = median)))+
+  geom_boxplot()+
+  geom_vline(aes(xintercept = median(profit_per_transaction)), color = "red", linewidth = 1.1)
+```
+
+```{r}
+diverging_post_codes <- Customer_Joined %>% 
+  mutate(post_code_cut = cut_width(postcode, 100, dig.lab = 5)) %>% 
+  group_by(post_code_cut) %>% 
+  summarise(
+    median_profit = median(profit_per_transaction),
+    sd_profit = sd(profit_per_transaction)
+  ) %>% 
+  mutate(median_ratio = median_profit/median(Customer_Joined$profit_per_transaction)) %>% 
+  arrange(desc(median_ratio)) %>% 
+  filter(median_ratio > 1.07 | median_ratio < 0.9) %>% 
+  pull(post_code_cut)
+
+diverging_post_codes <- as.character(diverging_post_codes)
+```
+
+```{r}
+Customer_Joined <- Customer_Joined %>% 
+  mutate(post_code_cut = as.character(cut_width(postcode, 100, dig.lab = 5))) %>% 
+  mutate(diverging_post_code = ifelse(post_code_cut %in% diverging_post_codes, post_code_cut, "Other"))
+
+New_Costumers <- New_Costumers %>% 
+  mutate(post_code_cut = as.character(cut_width(postcode, 100, dig.lab = 5))) %>% 
+  mutate(diverging_post_code = ifelse(post_code_cut %in% diverging_post_codes, post_code_cut, "Other"))
+```
+
+
+
+
+Potential bins :
+
+Positives:
+(3550, 3750], (2850, 3050], (3350, 3450], (4750, 4850]
+
+Negatives:
+(4350, 4450], (4850, 4950] 
+
+
 ```{r}
 Customer_Joined %>% 
-  ggplot(aes(total_profit))+
-  geom_histogram(color = "white")
+  ggplot(aes(profit_per_transaction, reorder(job_industry_category, profit_per_transaction, FUN = median)))+
+  geom_boxplot()+
+  geom_vline(aes(xintercept = median(profit_per_transaction)), color = "red", linewidth = 1.1, alpha = 0.4)+
+  geom_vline(aes(xintercept = mean(profit_per_transaction)), color = "blue", linewidth = 1.1, alpha = 0.4)
+```
+
+Positives:
+Entertainment, Financial Services, IT
+
+Negatives:
+Argiculture(yeah it is a typo in the data)
+
+
+```{r, fig.height=16, fig.width=8}
+Customer_Joined %>% 
+  ggplot(aes(profit_per_transaction, reorder(job_title, profit_per_transaction, FUN = median)))+
+  geom_boxplot()+
+  geom_vline(aes(xintercept = median(profit_per_transaction)), color = "red", linewidth = 1.1, alpha = 0.4)+
+  geom_vline(aes(xintercept = mean(profit_per_transaction)), color = "blue", linewidth = 1.1, alpha = 0.4)
 ```
 
 ```{r}
 Customer_Joined %>% 
-  ggplot(aes(profit_per_transaction, reorder(state, profit_per_transaction)))+
-  geom_boxplot()
+  group_by(job_industry_category) %>% 
+  summarise(
+    median_profit = median(profit_per_transaction),
+    sd_profit = sd(profit_per_transaction)
+  ) %>% 
+  mutate(median_ratio = median_profit/median(Customer_Joined$profit_per_transaction)) %>% 
+  arrange(desc(median_ratio)) 
+```
+
+
+
+Positives:
+All the manager titles I should probably create separate dummies.
+
+```{r}
+diverging_job_titles <- Customer_Joined %>% 
+  group_by(job_title) %>% 
+  summarise(
+    median_profit = median(profit_per_transaction),
+    sd_profit = sd(profit_per_transaction)
+  ) %>% 
+  mutate(median_ratio = median_profit/median(Customer_Joined$profit_per_transaction)) %>% 
+  arrange(desc(median_ratio)) %>% 
+  filter(median_ratio > 1.2 | median_ratio < 0.8) %>% 
+  pull(job_title)
 ```
 
 ```{r}
-Transactions
+Customer_Joined <- Customer_Joined %>% 
+  mutate(diverging_job_title = ifelse(job_title %in% diverging_job_titles, job_title, "Other")) 
+
+New_Costumers <- New_Costumers %>% 
+  mutate(diverging_job_title = ifelse(job_title %in% diverging_job_titles, job_title, "Other"))
 ```
 
 
+```{r}
 
+```
 
+```{r}
+#write_csv(Customer_Joined, "customer_all.csv")
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+#write_csv(New_Costumers, "new_customers.csv")
+```
 
 
 

@@ -1,7 +1,6 @@
 ---
 output:
   html_document:
-    keep_md: true
     theme: simplex
     highlight: pygments
     toc: true
@@ -10,8 +9,7 @@ output:
       smooth_scroll: true
     toc_depth: 4
     df_print: paged
-    code_folding: hide
-fontsize: 12pt
+    code_folding: show
 ---
 
 ```{r, include=FALSE}
@@ -413,20 +411,13 @@ New_Costumers <- New_Costumers %>%
 Lastly I am saving cleaned tables. Machine Learning Modeling will be done in Python.
 
 ```{r}
-write_csv(Customer_Joined, "customer_all.csv")
+#write_csv(Customer_Joined, "customer_all.csv")
 
-write_csv(New_Costumers, "new_customers.csv")
+#write_csv(New_Costumers, "new_customers.csv")
 ```
 
 
-```{r, fig.height=8, fig.width=7}
-Customer_Joined %>% 
-  ggplot(aes(profit_per_transaction, reorder(diverging_job_title, profit_per_transaction, FUN = median), fill = diverging_job_title))+
-  geom_boxplot(show.legend = F, alpha = 0.7)+
-  geom_vline(aes(xintercept = median(profit_per_transaction)), color = "red", linewidth = 1.1, alpha = 0.8)+
-  labs(x = NULL, y = NULL)+
-  theme_minimal()
-```
+
 
 
 

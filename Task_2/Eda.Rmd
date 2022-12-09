@@ -80,6 +80,8 @@ response_table <- Transactions %>%
     n_transaction = n()
   ) %>% 
   mutate(profit_per_transaction = total_profit / n_transaction)
+
+head(response_table)
 ```
 
 The number of transactions seems like a nice candidate for Poisson Regression but Profits per Transaction has nice distribution except for very high values.
@@ -209,7 +211,7 @@ Customer_Joined <- CustomerDemographic %>%
 
 In the join process 2 observations were also lost. For now, this completes the data cleaning process for our training set.
 
-## Cleaning the new data New Customer List
+## Cleaning the new data New Customer List Table
 
 Filtering out irrelevant columns and creating a new data set.
 
@@ -272,10 +274,10 @@ Everything looks fine here.
 
 ```{r}
 Customer_Joined %>% 
-  inner_join(response_table, by = "customer_id") 
+  inner_join(response_table, by = "customer_id") %>% nrow()
 ```
 
-Seems like some of the customers didn't buy anything in 2017. I think leaving them out would be wrong and we would lose a good chunk of our data. After I join these two tables I am also going to set profit values to zero for these consumers. This way Machine Learning algorithm can learn what kind of consumers don't make any transactions.
+Seems like some of the customers didn't buy anything in 2017. I think leaving them out would be wrong and we would lose a good chunk of our data. After I left join these two tables I am also going to set profit values to zero for these consumers. This way Machine Learning algorithm may be able to learn what kind of consumers don't make any transactions.
 
 ```{r}
 Customer_Joined <- Customer_Joined %>% 
@@ -284,8 +286,6 @@ Customer_Joined <- Customer_Joined %>%
                   n_transaction = 0,
                   profit_per_transaction = 0))
 ```
-
-
 
 
 # Exploratory Data Analysis
@@ -298,9 +298,27 @@ Customer_Joined %>% skim()
 
 ## Continious Variables
 
+As it can be seen below our numeric variables don't really explain any variation(all smoother lines are horizontal.).Those variables will most likely be useless in the modelling process.
+ 
+```{r}
+plot_scatter <- function(x){
+  
+    ggplot(aes_string(x = x, y = "profit_per_transaction"), data = Customer_Joined)+
+    geom_point(alpha = 0.8)+
+    geom_smooth()
+}
+
+vars_to_plot <- c("tenure", "age", "past_3_years_bike_related_purchases",
+                  "property_valuation")
+
+patchwork::wrap_plots(map(vars_to_plot, plot_scatter))
+
+```
+
 
 ## Categorical Variables
 
+I binned the post codes in the assumption that post codes that are closer each other numerically should also be closer geographically. Maybe some places are much more suitable for bike riding than others. Box-Plot below kind of proves this point. It should be noted that even though some places differ by their median values their distributions are similar. This presents problems in terms of Machine Learning modeling.
 
 ```{r, fig.width=7, fig.height=8}
 Customer_Joined %>% 
@@ -310,7 +328,19 @@ Customer_Joined %>%
   geom_vline(aes(xintercept = median(profit_per_transaction)), color = "red", linewidth = 1.1)
 ```
 
+Still, I am going to use post code ranges which diverged from the sample median. In order to be able to to that I divided group median with sample median and created dummy variables if the ratio is above or below 1.
+
 ```{r}
+Customer_Joined %>% 
+  mutate(post_code_cut = cut_width(postcode, 100, dig.lab = 5)) %>% 
+  group_by(post_code_cut) %>% 
+  summarise(
+    median_profit = median(profit_per_transaction),
+    sd_profit = sd(profit_per_transaction)
+  ) %>% 
+  mutate(median_ratio = median_profit/median(Customer_Joined$profit_per_transaction)) %>% 
+  arrange(desc(median_ratio))
+
 diverging_post_codes <- Customer_Joined %>% 
   mutate(post_code_cut = cut_width(postcode, 100, dig.lab = 5)) %>% 
   group_by(post_code_cut) %>% 
@@ -336,17 +366,7 @@ New_Costumers <- New_Costumers %>%
   mutate(diverging_post_code = ifelse(post_code_cut %in% diverging_post_codes, post_code_cut, "Other"))
 ```
 
-
-
-
-Potential bins :
-
-Positives:
-(3550, 3750], (2850, 3050], (3350, 3450], (4750, 4850]
-
-Negatives:
-(4350, 4450], (4850, 4950] 
-
+`job_industry_category` isn't showing justifiable differences so I am leaving it out.
 
 ```{r}
 Customer_Joined %>% 
@@ -356,12 +376,7 @@ Customer_Joined %>%
   geom_vline(aes(xintercept = mean(profit_per_transaction)), color = "blue", linewidth = 1.1, alpha = 0.4)
 ```
 
-Positives:
-Entertainment, Financial Services, IT
-
-Negatives:
-Argiculture(yeah it is a typo in the data)
-
+Manager level customers are very lucrative. Of course having incomes of customers instead of their jobs would be better. It should be possible to get average income values for these professions from 3rd party databases but for now that's too much work.
 
 ```{r, fig.height=16, fig.width=8}
 Customer_Joined %>% 
@@ -371,21 +386,8 @@ Customer_Joined %>%
   geom_vline(aes(xintercept = mean(profit_per_transaction)), color = "blue", linewidth = 1.1, alpha = 0.4)
 ```
 
-```{r}
-Customer_Joined %>% 
-  group_by(job_industry_category) %>% 
-  summarise(
-    median_profit = median(profit_per_transaction),
-    sd_profit = sd(profit_per_transaction)
-  ) %>% 
-  mutate(median_ratio = median_profit/median(Customer_Joined$profit_per_transaction)) %>% 
-  arrange(desc(median_ratio)) 
-```
 
-
-
-Positives:
-All the manager titles I should probably create separate dummies.
+I am using the same median ratio trick to differentiate jobs and create dummies for those.
 
 ```{r}
 diverging_job_titles <- Customer_Joined %>% 
@@ -396,7 +398,7 @@ diverging_job_titles <- Customer_Joined %>%
   ) %>% 
   mutate(median_ratio = median_profit/median(Customer_Joined$profit_per_transaction)) %>% 
   arrange(desc(median_ratio)) %>% 
-  filter(median_ratio > 1.2 | median_ratio < 0.8) %>% 
+  filter(median_ratio > 1.2 | median_ratio < 0.85) %>% 
   pull(job_title)
 ```
 
@@ -408,15 +410,22 @@ New_Costumers <- New_Costumers %>%
   mutate(diverging_job_title = ifelse(job_title %in% diverging_job_titles, job_title, "Other"))
 ```
 
+Lastly I am saving cleaned tables. Machine Learning Modeling will be done in Python.
 
 ```{r}
+write_csv(Customer_Joined, "customer_all.csv")
 
+write_csv(New_Costumers, "new_customers.csv")
 ```
 
-```{r}
-#write_csv(Customer_Joined, "customer_all.csv")
 
-#write_csv(New_Costumers, "new_customers.csv")
+```{r, fig.height=8, fig.width=7}
+Customer_Joined %>% 
+  ggplot(aes(profit_per_transaction, reorder(diverging_job_title, profit_per_transaction, FUN = median), fill = diverging_job_title))+
+  geom_boxplot(show.legend = F, alpha = 0.7)+
+  geom_vline(aes(xintercept = median(profit_per_transaction)), color = "red", linewidth = 1.1, alpha = 0.8)+
+  labs(x = NULL, y = NULL)+
+  theme_minimal()
 ```
 
 

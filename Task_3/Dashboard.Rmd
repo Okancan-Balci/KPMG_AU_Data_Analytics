@@ -1,0 +1,442 @@
+---
+title: "Sales and Customers"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(tidyverse)
+library(readxl)
+library(GGally)
+library(broom)
+library(ggfortify)
+library(skimr)
+library(lubridate)
+library(janitor) ## excel_numeric_to_date()
+library(scales)
+library(patchwork)
+
+theme_set(theme_minimal(base_size = 15))
+
+options(scipen = 20)
+
+knitr::opts_chunk$set(warning = FALSE,
+                      message = FALSE,
+                      fig.align = "center",
+                      fig.width = 8)
+```
+
+```{r, include=FALSE}
+sheets <- readxl::excel_sheets("../Task_2/KPMG_VI_New_raw_data_update_final.xlsx")[-1]
+
+
+for (sheet in sheets) {
+    assign(as.character(sheet),
+           read_xlsx("../Task_2/KPMG_VI_New_raw_data_update_final.xlsx", sheet = sheet, skip = 1))
+}
+
+Transactions <- Transactions %>% 
+  filter(order_status != "Cancelled")
+
+Transactions <- Transactions %>% 
+  filter(!is.na(standard_cost))
+
+Transactions <- Transactions %>% 
+  mutate(profit = list_price - standard_cost,
+         product_first_sold_date = convert_to_date(product_first_sold_date))
+
+```
+
+```{r, include=FALSE}
+CustomerDemographic <- CustomerDemographic %>% 
+  mutate(gender = ifelse(gender %in% c("F", "Femal"), "Female", gender)) %>%
+  mutate(gender = ifelse(gender == "M", "Male", gender))
+
+CustomerDemographic <- CustomerDemographic %>% 
+  select(-default, -first_name, -last_name, -deceased_indicator)
+
+## Missing Values for variable job_title
+CustomerDemographic %>% 
+  pull(job_title) %>% is.na() %>% sum()
+## Missing Values for variable job_industry_category
+CustomerDemographic %>% 
+  filter(job_industry_category == "n/a") %>% nrow()
+
+CustomerDemographic <- CustomerDemographic %>% 
+  mutate(job_title = str_remove(job_title, regex(" [IV]+")))
+
+CustomerDemographic <- CustomerDemographic %>% 
+  filter(!is.na(job_title))
+
+CustomerDemographic <- CustomerDemographic %>% 
+  filter(!is.na(tenure)) 
+
+CustomerDemographic <- CustomerDemographic %>% 
+  mutate(DOB = convert_to_date(DOB))
+
+CustomerDemographic %>% 
+  slice_min(order_by = DOB, n = 5)
+
+CustomerDemographic <- CustomerDemographic %>% 
+  filter(customer_id != 34)
+
+CustomerDemographic <- CustomerDemographic %>% 
+  mutate(age = as.integer((ymd("2017-06-01") - DOB) / 365.25))
+
+CustomerAddress <- CustomerAddress %>% 
+  mutate(state = ifelse(state == "New South Wales", "NSW", state),
+         state = ifelse(state == "Victoria", "VIC", state)) 
+
+Customer_Joined <- CustomerDemographic %>% 
+  inner_join(CustomerAddress, by = "customer_id") %>% 
+  select(-country)
+
+Transactions <- Customer_Joined %>% 
+  inner_join(Transactions, by = "customer_id") 
+
+names(Transactions)
+```
+
+# Profits by Goods
+
+## Column Brands {data-width=400}
+
+### Profits by Brands
+
+```{r}
+p1 <- Transactions %>% 
+  group_by(brand) %>% 
+  summarise(
+    sum_profit = sum(profit),
+    n = n(),
+    profit_per_n = sum_profit / n
+  ) %>% 
+  ggplot(aes(sum_profit, reorder(brand, sum_profit), fill = brand))+
+  geom_col(show.legend = F, alpha = 0.8)+
+  scale_fill_brewer(palette = "Set2")+
+  scale_x_continuous(labels = scales::dollar_format())+
+  labs(y = NULL, x = "Total Profit")
+```
+
+```{r}
+p2 <- Transactions %>% 
+  group_by(brand) %>% 
+  summarise(
+    sum_profit = sum(profit),
+    n = n(),
+    profit_per_n = sum_profit / n
+  ) %>% 
+  ggplot(aes(profit_per_n, reorder(brand, profit_per_n), fill = brand))+
+  geom_col(show.legend = F, alpha = 0.8)+
+  scale_fill_brewer(palette = "Set2")+
+  scale_x_continuous(labels = scales::dollar_format())+
+  labs(y = NULL, x = "Profits per Transaction")
+```
+
+```{r, fig.width=7, fig.height=10}
+p1 / p2
+```
+
+
+## Column Product Properties {data-width=300, .tabset}
+
+### Profits by Product Size
+
+```{r}
+p1 <- Transactions %>% 
+  group_by(product_size) %>% 
+  summarise(
+    sum_profit = sum(profit),
+    n = n(),
+    profit_per_n = sum_profit / n
+  ) %>% 
+  ggplot(aes(sum_profit, reorder(product_size, sum_profit), fill = product_size))+
+  geom_col(show.legend = F, alpha = 0.8)+
+  scale_fill_brewer(palette = "Set2")+
+  scale_x_continuous(labels = scales::dollar_format(),breaks = c(1e6, 3e6, 5e6))+
+  labs(y = NULL, x = "Total Profit")
+```
+
+
+```{r}
+p2 <- Transactions %>% 
+  group_by(product_size) %>% 
+  summarise(
+    sum_profit = sum(profit),
+    n = n(),
+    profit_per_n = sum_profit / n
+  ) %>% 
+  ggplot(aes(profit_per_n, reorder(product_size, profit_per_n), fill = product_size))+
+  geom_col(show.legend = F, alpha = 0.8)+
+  scale_fill_brewer(palette = "Set2")+
+  scale_x_continuous(labels = scales::dollar_format())+
+  labs(y = NULL, x = "Profits per Transaction")
+```
+
+```{r, fig.width=7, fig.height=10}
+p1 / p2
+```
+
+### Profits by Product Class
+
+```{r}
+p1 <- Transactions %>% 
+  group_by(product_class) %>% 
+  summarise(
+    sum_profit = sum(profit),
+    n = n(),
+    profit_per_n = sum_profit / n
+  ) %>% 
+  ggplot(aes(sum_profit, reorder(product_class, sum_profit), fill = product_class))+
+  geom_col(show.legend = F, alpha = 0.8)+
+  scale_fill_brewer(palette = "Set2")+
+  scale_x_continuous(labels = scales::dollar_format())+
+  labs(y = NULL, x = "Total Profit")
+
+p2 <- Transactions %>% 
+  group_by(product_class) %>% 
+  summarise(
+    sum_profit = sum(profit),
+    n = n(),
+    profit_per_n = sum_profit / n
+  ) %>% 
+  ggplot(aes(profit_per_n, reorder(product_class, profit_per_n), fill = product_class))+
+  geom_col(show.legend = F, alpha = 0.8)+
+  scale_fill_brewer(palette = "Set2")+
+  scale_x_continuous(labels = scales::dollar_format())+
+  labs(y = NULL, x = "Profits per Transaction")
+```
+
+```{r, fig.width=7, fig.height=10}
+p1 / p2
+```
+
+
+### Profits by Product Line
+
+```{r}
+p1 <- Transactions %>% 
+  group_by(product_line) %>% 
+  summarise(
+    sum_profit = sum(profit),
+    n = n(),
+    profit_per_n = sum_profit / n
+  ) %>% 
+  ggplot(aes(sum_profit, reorder(product_line, sum_profit), fill = product_line))+
+  geom_col(show.legend = F, alpha = 0.8)+
+  scale_fill_brewer(palette = "Set2")+
+  scale_x_continuous(labels = scales::dollar_format())+
+  labs(y = NULL, x = "Total Profit")
+
+p2 <- Transactions %>% 
+  group_by(product_line) %>% 
+  summarise(
+    sum_profit = sum(profit),
+    n = n(),
+    profit_per_n = sum_profit / n
+  ) %>% 
+  ggplot(aes(profit_per_n, reorder(product_line, profit_per_n), fill = product_line))+
+  geom_col(show.legend = F, alpha = 0.8)+
+  scale_fill_brewer(palette = "Set2")+
+  scale_x_continuous(labels = scales::dollar_format())+
+  labs(y = NULL, x = "Profits per Transaction")
+```
+
+
+```{r, fig.width=7, fig.height=10}
+p1 / p2
+```
+
+
+## Column Time {data-width=300}
+
+### Amount of Profits per Month
+
+```{r}
+Transactions %>% 
+  mutate(month = month(transaction_date, label = TRUE, locale = "english")) %>% 
+  group_by(month) %>% 
+  summarise(
+    sum_profit = sum(profit),
+    n = n(),
+    profit_per_n = sum_profit / n
+  ) %>% 
+  ggplot(aes(month, sum_profit))+
+  geom_col(fill ="steelblue", alpha = 0.8)+
+  geom_line(aes(group = 1), linewidth = 1.5, alpha = 0.8)+
+  geom_point(color = "gray", size = 3, alpha = 0.8)+
+  scale_y_continuous(labels = scales::dollar_format())+
+  labs(y = "Profits", x = NULL)
+```
+
+### Number of Transactions per Month
+
+```{r}
+Transactions %>% 
+  mutate(month = month(transaction_date, label = TRUE, locale = "english")) %>% 
+  group_by(month) %>% 
+  summarise(
+    sum_profit = sum(profit),
+    n = n(),
+    profit_per_n = sum_profit / n
+  ) %>% 
+  ggplot(aes(month, n))+
+  geom_col(fill ="steelblue", alpha = 0.8)+
+  geom_line(aes(group = 1), linewidth = 1.5, alpha = 0.8)+
+  geom_point(color = "gray", size = 3, alpha = 0.8)+
+  labs(y = "Amount of Transactions", x = NULL) 
+
+```
+
+
+# Profits by Demographics
+
+## Job Titles {data-width=700}
+
+### Best and Worst 15 Profitable Job Titles
+
+```{r}
+p1 <- Transactions %>% 
+  group_by(job_title) %>% 
+  summarise(
+    sum_profit = sum(profit),
+    n = n(),
+    profit_per_n = sum_profit / n
+    
+  ) %>% 
+  slice_max(order_by = profit_per_n, n = 15) %>% 
+  bind_rows(
+    Transactions %>% 
+  group_by(job_title) %>% 
+  summarise(
+    sum_profit = sum(profit),
+    n = n(),
+    profit_per_n = sum_profit / n
+    
+  ) %>% 
+  slice_min(order_by = profit_per_n, n = 15)
+  ) %>% 
+  ggplot(aes(sum_profit, reorder(job_title, sum_profit), fill = sum_profit))+
+  geom_col(show.legend = F, alpha = 0.8)+
+  scale_fill_gradient(low = "darkgreen", high = "green")+
+  scale_x_continuous(labels = scales::dollar_format())+
+  labs(y = NULL, x = "Total Profit")
+
+p2 <- Transactions %>% 
+  group_by(job_title) %>% 
+  summarise(
+    sum_profit = sum(profit),
+    n = n(),
+    profit_per_n = sum_profit / n
+    
+  ) %>% 
+  slice_max(order_by = profit_per_n, n = 15) %>% 
+  bind_rows(
+    Transactions %>% 
+  group_by(job_title) %>% 
+  summarise(
+    sum_profit = sum(profit),
+    n = n(),
+    profit_per_n = sum_profit / n
+    
+  ) %>% 
+  slice_min(order_by = profit_per_n, n = 15)
+  ) %>% 
+  ggplot(aes(profit_per_n, reorder(job_title, profit_per_n), fill = profit_per_n))+
+  geom_col(show.legend = F, alpha = 0.8)+
+  scale_fill_gradient(low = "darkgreen", high = "green")+
+  scale_x_continuous(labels = scales::dollar_format())+
+  labs(y = NULL, x = "Profit per Transaction")
+```
+
+```{r, fig.width=16, fig.height=10}
+p1+p2
+```
+
+
+## Other Information {data-width=300}
+
+### Profits by State
+
+```{r}
+p1 <- Transactions %>% 
+  group_by(state) %>% 
+  summarise(
+    sum_profit = sum(profit),
+    n = n(),
+    profit_per_n = sum_profit / n
+  ) %>% 
+  ggplot(aes(sum_profit, reorder(state, sum_profit), fill = state))+
+  geom_col(show.legend = F, alpha = 0.7)+
+  scale_x_continuous(labels = scales::dollar_format(), breaks = c(1e6, 2.5e6, 4e6))+
+  scale_fill_brewer(palette = "Set2")+
+  labs(y = NULL, x = "Total Profits")
+
+p2 <- Transactions %>% 
+  group_by(state) %>% 
+  summarise(
+    sum_profit = sum(profit),
+    n = n(),
+    profit_per_n = sum_profit / n
+  ) %>% 
+  ggplot(aes(profit_per_n, reorder(state, profit_per_n), fill = state))+
+  geom_col(show.legend = F, alpha = 0.7)+
+  scale_x_continuous(labels = scales::dollar_format())+
+  scale_fill_brewer(palette = "Set2")+
+  labs(y = NULL, x = "Profit per Transaction")
+
+p1/p2
+  
+```
+
+### Profits by the status of owning a car
+
+```{r}
+p1 <- Transactions %>% 
+  group_by(owns_car) %>% 
+  summarise(
+    sum_profit = sum(profit),
+    n = n(),
+    profit_per_n = sum_profit / n
+  ) %>% 
+  ggplot(aes(sum_profit, reorder(owns_car, sum_profit), fill = owns_car))+
+  geom_col(show.legend = F, alpha = 0.7)+
+  scale_x_continuous(labels = scales::dollar_format(), breaks = c(1e6, 2.5e6, 4e6))+
+  scale_fill_brewer(palette = "Set2")+
+  labs(y = NULL, x = "Total Profits")
+
+p2 <- Transactions %>% 
+  group_by(owns_car) %>% 
+  summarise(
+    sum_profit = sum(profit),
+    n = n(),
+    profit_per_n = sum_profit / n
+  ) %>% 
+  ggplot(aes(profit_per_n, reorder(owns_car, profit_per_n), fill = owns_car))+
+  geom_col(show.legend = F, alpha = 0.7)+
+  scale_x_continuous(labels = scales::dollar_format())+
+  scale_fill_brewer(palette = "Set2")+
+  labs(y = NULL, x = "Profit per Transaction")
+
+p1/p2
+  
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

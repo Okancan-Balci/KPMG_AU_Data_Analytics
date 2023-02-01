@@ -4,7 +4,7 @@
 
 This repo contains all the tasks that were given by this program. 
 
-In order to see reports and dashboards download their respective .HTML files and open the file with your web browser.
+**In order to see reports and dashboards download their respective .HTML files and open the file with your web browser.**
 
 * Task 1: Data Quality Assessment ([EDA.html](https://raw.githubusercontent.com/Okancan-Balci/KPMG_AU_Data_Analytics/master/Task_1/EDA.html))
 	

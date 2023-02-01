@@ -4,17 +4,19 @@
 
 This repo contains all the tasks that were given by this program. 
 
-* Task 1: Data Quality Assessment
+In order to see reports and dashboards download their respective .HTML files and open the file with your web browser.
+
+* Task 1: Data Quality Assessment ([EDA.html](https://raw.githubusercontent.com/Okancan-Balci/KPMG_AU_Data_Analytics/master/Task_1/EDA.html))
 	
 	* In the HTML file, there is an in depth report about the quality of the given data. 
 	* Actions to mitigate potential and current data problems were presented.
 	* Further suggestions for potential data quality improvements were made.
 
-* Task 2: Data Insights
+* Task 2: Data Insights ([EDA.html](https://raw.githubusercontent.com/Okancan-Balci/KPMG_AU_Data_Analytics/master/Task_2/EDA.html))
 
 	* The data was cleaned and made ready for Machine Learning Modelling in `EDA.Rmd` file.
-	* Potential high values consumers were predicted with Sci-Kit Learn and models were evaluated and diagnosed.(Customer_Prediction.ipynb)
+	* Potential high values consumers were predicted with Sci-Kit Learn and models were evaluated and diagnosed.([Customer_Prediction.ipynb](https://github.com/Okancan-Balci/KPMG_AU_Data_Analytics/blob/master/Task_2/Customer_Prediction.ipynb))
 
-* Task 3: Data Insights and Presentation
+* Task 3: Data Insights and Presentation ([Dashboard.html](https://raw.githubusercontent.com/Okancan-Balci/KPMG_AU_Data_Analytics/master/Task_3/Dashboard.html))
 
 	* Created a dashboard in order to share insights about current customers.

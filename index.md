@@ -15,7 +15,7 @@ This website contains all the tasks that were given by this program.
 	* The data was cleaned and made ready for Machine Learning Modelling in `EDA.Rmd` file.
 	* Potential high values consumers were predicted with Sci-Kit Learn and models were evaluated and diagnosed.([Customer_Prediction.ipynb](https://github.com/Okancan-Balci/KPMG_AU_Data_Analytics/blob/master/Task_2/Customer_Prediction.ipynb))
 
-* Task 3: Data Insights and Presentation <a href="Dashboard.html"> Mini-Dashboard </a>
+* Task 3: Data Insights and Presentation <a href="Task_3/Dashboard.html"> Mini-Dashboard </a>
 
 	* Created a dashboard in order to share insights about current customers.
 	

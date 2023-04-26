@@ -20,3 +20,6 @@ This repo contains all the tasks that were given by this program.
 * Task 3: Data Insights and Presentation ([Dashboard.html](https://raw.githubusercontent.com/Okancan-Balci/KPMG_AU_Data_Analytics/master/Task_3/Dashboard.html))
 
 	* Created a dashboard in order to share insights about current customers.
+	
+	
+<a href="Task_1/EDA.html"> EDA Report </a>
